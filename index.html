@@ -431,14 +431,17 @@ async function callGemini(system, messages, maxTokens = 1024) {
   const { apiKey } = cfg();
   if (!apiKey) { openSetup(); throw new Error('請先設定 Gemini API Key'); }
 
-  // Gemini 用 user/model，Anthropic 用 user/assistant
-  const contents = messages.map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }],
-  }));
+  // 把 system prompt 當作第一輪對話注入（v1 不支援 system_instruction）
+  const contents = [
+    { role: 'user',  parts: [{ text: system }] },
+    { role: 'model', parts: [{ text: '好的，我明白了，我會照著這個角色來回應。' }] },
+    ...messages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    })),
+  ];
 
   const body = {
-    system_instruction: { parts: [{ text: system }] },
     contents,
     generationConfig: { maxOutputTokens: maxTokens },
   };
