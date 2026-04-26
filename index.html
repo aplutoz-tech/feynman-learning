@@ -323,7 +323,7 @@ input[type=text]:focus, textarea:focus { border-color: var(--primary); backgroun
 // ══════════════════════════════════════════════════════════════
 // Constants
 // ══════════════════════════════════════════════════════════════
-const MODEL = 'gemini-1.5-flash-latest';
+const MODEL = 'gemini-1.5-flash';
 
 const STUDENT_SYS = `你是一個好奇但完全不懂專業術語的12歲學生，名叫小明。
 1. 認真聽解釋，誠實說出不懂的地方
@@ -444,7 +444,7 @@ async function callGemini(system, messages, maxTokens = 1024) {
   };
 
   const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
