@@ -164,9 +164,9 @@ input[type=text]:focus, textarea:focus { border-color: var(--primary); backgroun
     <p class="subtitle">設定一次，之後自動使用。資料只存在你的瀏覽器，不會上傳。</p>
 
     <div class="field">
-      <label>Gemini API Key <span style="color:red">*</span></label>
-      <input type="text" id="cfg-apikey" placeholder="AIzaSy..." autocomplete="off">
-      <div class="hint">免費取得：<a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a>（免信用卡）</div>
+      <label>Groq API Key <span style="color:red">*</span></label>
+      <input type="text" id="cfg-apikey" placeholder="gsk_..." autocomplete="off">
+      <div class="hint">免費取得：<a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a>（免信用卡）</div>
     </div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px">
@@ -323,7 +323,7 @@ input[type=text]:focus, textarea:focus { border-color: var(--primary); backgroun
 // ══════════════════════════════════════════════════════════════
 // Constants
 // ══════════════════════════════════════════════════════════════
-const MODEL = 'gemini-2.0-flash-lite';
+const MODEL = 'llama-3.3-70b-versatile';
 
 const STUDENT_SYS = `你是一個好奇但完全不懂專業術語的12歲學生，名叫小明。
 1. 認真聽解釋，誠實說出不懂的地方
@@ -425,42 +425,34 @@ function goTo(screen) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// Gemini API
+// Groq API（OpenAI 相容格式，完全免費）
 // ══════════════════════════════════════════════════════════════
-async function callGemini(system, messages, maxTokens = 1024) {
+async function callGroq(system, messages, maxTokens = 1024) {
   const { apiKey } = cfg();
-  if (!apiKey) { openSetup(); throw new Error('請先設定 Gemini API Key'); }
+  if (!apiKey) { openSetup(); throw new Error('請先設定 Groq API Key'); }
 
-  // 把 system prompt 當作第一輪對話注入（v1 不支援 system_instruction）
-  const contents = [
-    { role: 'user',  parts: [{ text: system }] },
-    { role: 'model', parts: [{ text: '好的，我明白了，我會照著這個角色來回應。' }] },
-    ...messages.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    })),
-  ];
-
-  const body = {
-    contents,
-    generationConfig: { maxOutputTokens: maxTokens },
-  };
-
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }
-  );
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: system },
+        ...messages,
+      ],
+    }),
+  });
 
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     throw new Error(e.error?.message || `API 錯誤 ${r.status}`);
   }
   const data = await r.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return data.choices?.[0]?.message?.content || '';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -480,7 +472,7 @@ async function startSession() {
     const firstMsg = { role: 'user', content: `我來教你一個概念：「${concept}」\n\n${explain}` };
     S.messages.push(firstMsg);
 
-    const reply = await callGemini(STUDENT_SYS, S.messages);
+    const reply = await callGroq(STUDENT_SYS, S.messages);
     S.messages.push({ role: 'assistant', content: reply });
 
     // Setup chat screen
@@ -545,7 +537,7 @@ async function sendChat() {
   S.messages.push({ role: 'user', content: msg });
 
   try {
-    const reply = await callGemini(STUDENT_SYS, S.messages);
+    const reply = await callGroq(STUDENT_SYS, S.messages);
     S.messages.push({ role: 'assistant', content: reply });
     S.exchanges++;
     document.getElementById('loading-bubble')?.remove();
@@ -574,7 +566,7 @@ async function goToAnalysis() {
   }
 
   try {
-    S.analysis = await callGemini(ANALYSIS_SYS,
+    S.analysis = await callGroq(ANALYSIS_SYS,
       [{ role: 'user', content: `分析這段費曼學習法對話：\n\n${conv}` }],
       2048);
     document.getElementById('analysis-box').textContent = S.analysis;
@@ -610,7 +602,7 @@ async function evalSimplify() {
   btn.disabled = true; btn.textContent = '評估中...';
 
   try {
-    S.evaluation = await callGemini(
+    S.evaluation = await callGroq(
       '你是費曼學習法教練，評估簡化解釋品質，語氣鼓勵但誠實，用繁體中文。',
       [{ role: 'user', content:
         `概念：${S.concept}\n挑戰：${S.challenge}\n學習者回答：${S.simplification}\n\n`+
